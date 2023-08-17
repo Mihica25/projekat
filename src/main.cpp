@@ -44,6 +44,8 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+unsigned int planeVAO;
+
 struct PointLight {
     glm::vec3 position;
     glm::vec3 ambient;
@@ -172,10 +174,45 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
+    //Face cull
+    // -----------------------------
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    glFrontFace(GL_CW);
+
     // build and compile shaders
     // -------------------------
     Shader ourShader("resources/shaders/2.model_lighting.vs", "resources/shaders/2.model_lighting.fs");
     Shader skyboxShader("resources/shaders/skybox.vs", "resources/shaders/skybox.fs");
+
+    //floor
+    float floorVertices[] = {
+            // positions                            // normals                      // texture coords
+            -100.0f, -0.25f,  100.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
+            100.0f, -0.25f,  100.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+            -100.0f, -0.25f, -100.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+
+            -100.0f, -0.25f, -100.0f,  0.0f, 1.0f, 0.0f,   0.0f, 10.0f,
+            100.0f, -0.25f,  100.0f,  0.0f, 1.0f, 0.0f,  10.0f,  0.0f,
+            100.0f, -0.25f, -100.0f,  0.0f, 1.0f, 0.0f,  10.0f, 10.0f
+    };
+
+    unsigned int floorVAO,floorVBO;
+    glGenVertexArrays(1, &floorVAO);
+    glGenBuffers(1, &floorVBO);
+    glBindVertexArray(floorVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, floorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(floorVertices), floorVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glBindVertexArray(0);
+
+    unsigned int floorTexture = loadTexture("resources/textures/fl1.jpg");
+
 
     // load models
     // -----------
@@ -193,19 +230,19 @@ int main() {
 
     PointLight& pointLight = programState->pointLight;
     pointLight.position = glm::vec3(4.0f, 4.0, 0.0);
-    pointLight.ambient = glm::vec3(0.9, 0.9, 0.9);
-    pointLight.diffuse = glm::vec3(1.0, 1.0, 1.0);
+    pointLight.ambient = glm::vec3(0.1, 0.1, 0.1);
+    pointLight.diffuse = glm::vec3(0.6, 0.6, 0.6);
     pointLight.specular = glm::vec3(1.0, 1.0, 1.0);
 
     pointLight.constant = 1.0f;
-    pointLight.linear = 0.05f;
-    pointLight.quadratic = 0.003f;
+    pointLight.linear = 0.09f;
+    pointLight.quadratic = 0.032f;
 
     DirLight& dirLight = programState->dirLight;
     dirLight.direction = glm::vec3(-0.2f, -1.0f, -0.3f);
-    dirLight.ambient = glm::vec3(1.0f, 1.0f, 1.0f);
-    dirLight.diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-    dirLight.specular = glm::vec3(1.0f, 1.0f, 1.0f);
+    dirLight.ambient = glm::vec3(0.5f, 0.5f, 0.5f);
+    dirLight.diffuse = glm::vec3(0.5f, 0.5f, 0.5f);
+    dirLight.specular = glm::vec3(0.4f, 0.4f, 0.4f);
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -306,6 +343,7 @@ int main() {
         glClearColor(programState->clearColor.r, programState->clearColor.g, programState->clearColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
         // don't forget to enable shader before setting uniforms
         ourShader.use();
         pointLight.position = glm::vec3(4.0 * cos(currentFrame), 4.0f, 4.0 * sin(currentFrame));
@@ -330,41 +368,45 @@ int main() {
         ourShader.setVec3("dirLight.diffuse", dirLight.diffuse);
         ourShader.setVec3("dirLight.specular", dirLight.specular);
 
-        // render the loaded model
-//        glm::mat4 model = glm::mat4(1.0f);
-//        model = glm::translate(model,
-//                               programState->backpackPosition); // translate it down so it's at the center of the scene
-//        model = glm::scale(model, glm::vec3(programState->backpackScale));    // it's a bit too big for our scene, so scale it down
-//        ourShader.setMat4("model", model);
-//        ourModel.Draw(ourShader);
+
+        //render models
+        glm::mat4 modelBag = glm::mat4(1.0f);
+        modelBag = glm::translate(modelBag, glm::vec3(30.0f,4.0f,0.0f));
+        ourShader.setMat4("model", modelBag);
+        bagModel.Draw(ourShader);
 
         //render modelRing
         glm::mat4 modelRing = glm::mat4(1.0f);
-        modelRing = glm::translate(modelRing, glm::vec3(-1.0f, -1.0f, -10.0f));
-        modelRing = glm::rotate(modelRing,glm::radians(-75.0f),glm::vec3(1.0,0,0));
+        modelRing = glm::translate(modelRing, glm::vec3(-1.0f, -0.2f, -10.0f));
+        modelRing = glm::rotate(modelRing,glm::radians(-90.0f),glm::vec3(1.0,0,0));
         modelRing = glm::scale(modelRing, glm::vec3(0.05f, 0.05f, 0.05f));
         ourShader.setMat4("model", modelRing);
         ringModel.Draw(ourShader);
 
         glm::mat4 modelGloves = glm::mat4(1.0f);
-        modelGloves = glm::translate(modelGloves, glm::vec3(30.0f, 0.0f ,0.0f));
+        modelGloves = glm::translate(modelGloves, glm::vec3(25.0f, 2.0f ,35.0f));
+        modelGloves = glm::rotate(modelGloves,glm::radians(-90.0f),glm::vec3(0,0,1.0));
         modelGloves = glm::scale(modelGloves, glm::vec3(0.1f,0.1f,0.1f));
         ourShader.setMat4("model", modelGloves);
         glovesModel.Draw(ourShader);
 
 
-        glm::mat4 modelBag = glm::mat4(1.0f);
-        modelBag = glm::translate(modelBag, glm::vec3(40.0f,0.0f,0.0f));
-        ourShader.setMat4("model", modelBag);
-        bagModel.Draw(ourShader);
-
         glm::mat4 modelHeadgear = glm::mat4(1.0f);
-//        modelHeadgear = glm::translate(modelHeadgear, glm::vec3(40.0f,0.0f,0.0f));
+        modelHeadgear = glm::translate(modelHeadgear, glm::vec3(20.0f,3.0f,40.0f));
+        modelHeadgear= glm::rotate(modelHeadgear,glm::radians(-90.0f),glm::vec3(0,0,1.0));
+        modelHeadgear = glm::scale(modelHeadgear, glm::vec3(2.0f,2.0f,2.0f));
         ourShader.setMat4("model", modelHeadgear);
         headgearModel.Draw(ourShader);
 
+        // render floor texture
+        ourShader.setMat4("model",glm::scale(glm::mat4(1.0f),glm::vec3(0.35f,0.6f,0.35f)));
+        glBindTexture(GL_TEXTURE_2D, floorTexture);
+        glBindVertexArray(floorVAO);
+        glDrawArrays(GL_TRIANGLES,0,6);
+
         // draw skybox as last
         glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+
         skyboxShader.use();
         view = glm::mat4(glm::mat3(programState->camera.GetViewMatrix())); // remove translation from the view matrix
         skyboxShader.setMat4("view", view);
