@@ -174,6 +174,11 @@ int main() {
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
 
+    //blending
+    // -----------------------------
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     //Face cull
     // -----------------------------
     glEnable(GL_CULL_FACE);
@@ -184,6 +189,7 @@ int main() {
     // -------------------------
     Shader ourShader("resources/shaders/2.model_lighting.vs", "resources/shaders/2.model_lighting.fs");
     Shader skyboxShader("resources/shaders/skybox.vs", "resources/shaders/skybox.fs");
+    Shader blendingShader("resources/shaders/blending.vs","resources/shaders/blending.fs");
 
     //floor
     float floorVertices[] = {
@@ -320,6 +326,33 @@ int main() {
     skyboxShader.use();
     skyboxShader.setInt("skybox", 0);
 
+    // load poster texture (for blending)
+    //------------
+    float posterVertices[] = {
+            0.0f, 0.0f,  0.905f, 0.0f,0.0f,
+            0.846f, 0.0f,  0.905f, 1.0f,0.0f,
+            0.0f, 0.0f, 0.0f, 0.0f,1.0f,
+
+            0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+            0.846f, 0.0f,  0.905f, 1.0f, 0.0f,
+            0.846f, 0.0f, 0.0f, 1.0f,1.0f
+    };
+
+    unsigned int posterVAO,posterVBO;
+    glGenVertexArrays(1, &posterVAO);
+    glGenBuffers(1, &posterVBO);
+    glBindVertexArray(posterVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, posterVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(posterVertices), posterVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)nullptr);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    glBindVertexArray(0);
+
+    unsigned int posterTexture = loadTexture("resources/textures/pr.png");
+    blendingShader.use();
+    blendingShader.setInt("texture1", 0);
 
     // draw in wireframe
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -371,20 +404,21 @@ int main() {
 
         //render models
         glm::mat4 modelBag = glm::mat4(1.0f);
-        modelBag = glm::translate(modelBag, glm::vec3(30.0f,4.0f,0.0f));
+        modelBag = glm::translate(modelBag, glm::vec3(27.0f,8.0f,27.0f));
+        modelBag = glm::scale(modelBag, glm::vec3(1.5f, 1.5f, 1.5f));
         ourShader.setMat4("model", modelBag);
         bagModel.Draw(ourShader);
 
         //render modelRing
         glm::mat4 modelRing = glm::mat4(1.0f);
-        modelRing = glm::translate(modelRing, glm::vec3(-1.0f, -0.2f, -10.0f));
+        modelRing = glm::translate(modelRing, glm::vec3(-13.0f, -0.2f, 0.0f));
         modelRing = glm::rotate(modelRing,glm::radians(-90.0f),glm::vec3(1.0,0,0));
         modelRing = glm::scale(modelRing, glm::vec3(0.05f, 0.05f, 0.05f));
         ourShader.setMat4("model", modelRing);
         ringModel.Draw(ourShader);
 
         glm::mat4 modelGloves = glm::mat4(1.0f);
-        modelGloves = glm::translate(modelGloves, glm::vec3(25.0f, 2.0f ,35.0f));
+        modelGloves = glm::translate(modelGloves, glm::vec3(20.0f, 2.0f ,34.0f));
         modelGloves = glm::rotate(modelGloves,glm::radians(-90.0f),glm::vec3(0,0,1.0));
         modelGloves = glm::scale(modelGloves, glm::vec3(0.1f,0.1f,0.1f));
         ourShader.setMat4("model", modelGloves);
@@ -392,7 +426,7 @@ int main() {
 
 
         glm::mat4 modelHeadgear = glm::mat4(1.0f);
-        modelHeadgear = glm::translate(modelHeadgear, glm::vec3(20.0f,3.0f,40.0f));
+        modelHeadgear = glm::translate(modelHeadgear, glm::vec3(17.0f,3.0f,32.0f));
         modelHeadgear= glm::rotate(modelHeadgear,glm::radians(-90.0f),glm::vec3(0,0,1.0));
         modelHeadgear = glm::scale(modelHeadgear, glm::vec3(2.0f,2.0f,2.0f));
         ourShader.setMat4("model", modelHeadgear);
@@ -403,6 +437,21 @@ int main() {
         glBindTexture(GL_TEXTURE_2D, floorTexture);
         glBindVertexArray(floorVAO);
         glDrawArrays(GL_TRIANGLES,0,6);
+
+        //render poster
+        blendingShader.use();
+        blendingShader.setMat4("view", view);
+        blendingShader.setMat4("projection", projection);
+        glm::mat4 posterModel = glm::mat4(1.0f);
+        posterModel = glm::translate(posterModel,glm::vec3(9.0f,23.0f,-5.0f));
+        posterModel= glm::rotate(posterModel,glm::radians(90.0f),glm::vec3(1.0,0.0,0.0));
+        posterModel= glm::rotate(posterModel,glm::radians(25.0f),glm::vec3(0.0,0.0,1.0));
+        posterModel = glm::scale(posterModel, glm::vec3(30.0f));
+        blendingShader.setMat4("model",posterModel);
+        glBindTexture(GL_TEXTURE_2D,posterTexture);
+        glBindVertexArray(posterVAO);
+        glDrawArrays(GL_TRIANGLES,0,6);
+       
 
         // draw skybox as last
         glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
